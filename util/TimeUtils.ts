@@ -12,8 +12,16 @@ export function getISOWeek(date: Date) {
     const weekDateRange = getWeekDateRange(yearOfThursday, weekNumber)
     return {
         weekNumber,
+        weekNumberFormatStr: formatWeekString(weekNumber),
         ...weekDateRange
     };
+}
+
+// 将输入的字符串转换为字典序排序兼容的格式
+function formatWeekString(weekNumber: number) {
+    const number = String(weekNumber);
+    // 填充零以保持字符串长度一致，假设最大数字为999
+    return number.padStart(3, '0');
 }
 
 function getWeekDateRange(year: number, weekNumber: number) {

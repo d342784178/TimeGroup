@@ -49,7 +49,7 @@ export function Index() {
                         const date = new Date(cellValue);
                         const weekOfYear = getISOWeek(date);
                         // 更新新字段的值
-                        const setValueResult = await table.setCellValue(naturalWeekField.id, record.recordId, `第${weekOfYear.weekNumber}周: ${weekOfYear.startDateStr}-${weekOfYear.endDateStr}`)
+                        const setValueResult = await table.setCellValue(naturalWeekField.id, record.recordId, `第${weekOfYear.weekNumberFormatStr}周: ${weekOfYear.startDateStr}-${weekOfYear.endDateStr}`)
                         // console.log('setValueResult', setValueResult)
                     } else {
                         const setValueResult = await table.setCellValue(naturalWeekField.id, record.recordId, `无分组`)
