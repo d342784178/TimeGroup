@@ -52,7 +52,7 @@ export function Index() {
                         const setValueResult = await table.setCellValue(naturalWeekField.id, record.recordId, `第${weekOfYear.weekNumberFormatStr}周: ${weekOfYear.startDateStr}-${weekOfYear.endDateStr}`)
                         // console.log('setValueResult', setValueResult)
                     } else {
-                        const setValueResult = await table.setCellValue(naturalWeekField.id, record.recordId, `无分组`)
+                        const setValueResult = await table.setCellValue(naturalWeekField.id, record.recordId, `0无分组`)
                     }
 
                 }
@@ -75,7 +75,7 @@ export function Index() {
                 if (!groupInfoResult.find(((sortInfo) => {
                     return sortInfo.fieldId === naturalWeekField.id
                 }))) {
-                    const addGroupResult = await natualGridView.addGroup({fieldId: naturalWeekField.id, desc: false})
+                    const addGroupResult = await natualGridView.addGroup({fieldId: naturalWeekField.id, desc: true})
                     // console.log('addGroupResult:', addGroupResult)
                 }
                 const hideFieldResult = await natualGridView.hideField(naturalWeekField.id)
