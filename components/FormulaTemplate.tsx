@@ -16,14 +16,14 @@ import styles from './index.module.css';
 import {getISOWeek} from "@/util/TimeUtils";
 import {EnumDesc, FieldDesc, Formula, formulas, InputProperty, Property, PropertyType} from "./formula";
 import usePageFocus from "@/components/hook/usePageFocus";
+import Option from "@douyinfe/semi-ui/lib/es/select/option";
 
 
 export default function FormulaTemplate() {
-    const [tableMetaList, setTableMetaList] = useState<ITableMeta[]>();
+    // const [tableMetaList, setTableMetaList] = useState<ITableMeta[]>();
     const [fieldMetaList, setFieldMetaList] = useState<IFieldMeta[]>();
     const [formulaIndex, setFormulaIndex] = useState<number>();
     const [tableId, setTableId] = useState<string>();
-    const [fieldId, setFieldId] = useState<string>();
     const [formulaPreview, setFormulaPreview] = useState<string>();
 
     const [loading, setLoading] = useState(false);
@@ -41,66 +41,50 @@ export default function FormulaTemplate() {
             }
         }
         setFormulaPreview(template)
+        console.log('formulaPreview', template)
     }
 
     const submit = useCallback(async (formData: object) => {
+        console.log('submit', JSON.stringify(formData))
         const table = await bitable.base.getTableById(tableId as string);
         console.log('table', table)
-        const field = await table.getFieldById(fieldId as string);
-        console.log('field', field)
-        console.log('formValus', JSON.stringify(formData))
         const newFieldId = await table.addField({
             type: FieldType.Formula,
             name: formulas[formulaIndex as number].name + "-" + Math.random().toString(36).slice(-4),
-        });
-        const setFieldResult = await table.setField(newFieldId, {
-            type: FieldType.Formula,
-            // name: '自然周',
             property: {
                 formula: formulaPreview
             },
-            // description: {content: '123123'}
+        });
+        const setFieldResult = await table.setField(newFieldId, {
+            property: {
+                formula: formulaPreview
+            },
         })
         console.log('setFieldResult', setFieldResult);
 
-    }, [tableId, fieldId, formulaIndex]);
-    useEffect(() => {
-        Promise.all([bitable.base.getTableMetaList(), bitable.base.getSelection()])
-            .then(([metaList, selection]) => {
-                setTableMetaList(metaList);
-                formApi.current?.setValues({table: selection.tableId});
-                tableChanged(selection.tableId as string)
-            });
-    }, []);
+    }, [tableId, formulaPreview, formulaIndex]);
 
-    usePageFocus(() => {//页面焦点变更 重新获取字段列
-        if (tableId) {
-            tableChanged(tableId)
-            console.log('重新获取到页面焦点, 重新获取字段列')
+    usePageFocus(async () => {//页面焦点变更 重新获取字段列
+        const activeTable = await bitable.base.getActiveTable()
+        if (activeTable) {
+            tableChanged(activeTable.id)
+            console.log('重新获取到页面焦点, 刷新字段列')
         }
     })
     const tableChanged = async (value: string | number | any[] | Record<string, any>) => {
         console.log("tableChanged", value)
+        const originTableId = tableId;
         setTableId(value as string)
         const table = await bitable.base.getTable(value as string)
         // 获取 table 下所有的附件字段
         const fieldMetaList = await table.getFieldMetaList();
         setFieldMetaList(fieldMetaList)
-        if (fieldMetaList.length > 0) {
-            fieldChanged(fieldMetaList[0].id)
-            formApi.current?.setValues({field: fieldMetaList[0].id, table: value, formula: formulaIndex});
-        }
     }
 
-    const formulaChanged = async (value: string | number | any[] | Record<string, any>) => {
+    const formulaChanged = async (value: string | number | any[] | Record<string, any> | undefined) => {
         console.log("formulaChanged", value)
         setFormulaIndex(value as number)
     }
-    const fieldChanged = async (value: string | number | any[] | Record<string, any>) => {
-        console.log("fieldChanged", value)
-        setFieldId(value as string)
-    }
-
 
     function generateUIComponents(formula: Formula) {
         console.log('generateUIComponents')
@@ -171,61 +155,34 @@ export default function FormulaTemplate() {
 
     return (
         <main className={styles.main}>
-            <h1>自然时间分组</h1>
-            <p>可以根据选择的时间字段,按照自然周进行分组. (会新建一列用于存放自然周数据,并新建一个视图进行分组展示)</p>
-            <Form labelPosition='top' getFormApi={(baseFormApi: BaseFormApi) => formApi.current = baseFormApi}>
-                <Form.Select field='table' label='选择数据表' placeholder="请选择数据表"
-                             style={{width: '100%'}} onChange={tableChanged}
-                             rules={[{required: true, message: 'required error'},]}>
-                    {
-                        Array.isArray(tableMetaList) && tableMetaList.map(({name, id}) => {
-                            return (
-                                <Form.Select.Option key={id} value={id}>
-                                    {name}
-                                </Form.Select.Option>
-                            );
-                        })
-                    }
-                </Form.Select>
-                <Form.Select field='formula' label='选择公式' placeholder="请选择公式"
-                             style={{width: '100%'}} onChange={formulaChanged} rules={[
-                    {required: true, message: 'required error'},
-                ]}>
-                    {
-                        Array.isArray(formulas) && formulas.map((formula, index) => {
-                            return (
-                                <Select.Option key={index} value={index}>
-                                    {formula.name}
-                                </Select.Option>
-                            );
-                        })
-                    }
-                </Form.Select>
-                {/*<Form.Select field='field' label='选择公式列' placeholder="请选择公示列"*/}
-                {/*             style={{width: '100%'}} onChange={fieldChanged} rules={[*/}
-                {/*    {required: true, message: 'required error'},*/}
-                {/*]}>*/}
-                {/*    {*/}
-                {/*        Array.isArray(fieldMetaList) && fieldMetaList.map(({name, id}) => {*/}
-                {/*            return (*/}
-                {/*                <Form.Select.Option key={id} value={id}>*/}
-                {/*                    {name}*/}
-                {/*                </Form.Select.Option>*/}
-                {/*            );*/}
-                {/*        })*/}
-                {/*    }*/}
-                {/*</Form.Select>*/}
-            </Form>
+            <h1>公式助手</h1>
+            <p>对于常用的一些公式提供便捷的配置方式</p>
+
+            <h3>公式选择</h3>
+            <Select placeholder="请选择公式"
+                    style={{width: '100%'}} onChange={formulaChanged}>
+                {
+                    Array.isArray(formulas) && formulas.map((formula, index) => {
+                        return (
+                            <Option key={index} value={index}>
+                                {formula.name}
+                            </Option>
+                        );
+                    })
+                }
+            </Select>
 
 
-            <Form labelPosition='top' onSubmit={submit}
+            <h3>公式参数</h3>
+
+            <Form labelPosition='inset' onSubmit={submit}
                   getFormApi={(baseFormApi: BaseFormApi) => formulaFormApi.current = baseFormApi}
                   onValueChange={formulaFormValueChange}>
                 {formulaIndex !== undefined && generateUIComponents(formulas[formulaIndex])}
-                <Button theme='solid' htmlType='submit' loading={loading}>生成公式</Button>
+                <Button theme='solid' htmlType='submit' loading={loading} disabled={formulaIndex===undefined}>生成公式</Button>
             </Form>
             <div>
-                <h4>公式预览</h4>
+                <h3>公式预览</h3>
                 <span>{formulaPreview}</span>
             </div>
         </main>
