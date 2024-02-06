@@ -3,7 +3,7 @@ import {
     bitable,
     FieldType,
     IField,
-    IFieldMeta,
+    IFieldMeta, IFormulaField,
     IGridView,
     IGridViewMeta,
     ITableMeta,
@@ -16,7 +16,7 @@ import styles from './index.module.css';
 import {getISOWeek} from "@/util/TimeUtils";
 
 
-export function Index() {
+export default function Index() {
     const [tableMetaList, setTableMetaList] = useState<ITableMeta[]>();
     const [fieldMetaList, setFieldMetaList] = useState<IFieldMeta[]>();
     const [loading, setLoading] = useState(false);
@@ -29,32 +29,29 @@ export function Index() {
                 const timeField = await table.getFieldById(fieldId);
 
                 //新增一列,用于存储自然周
-                let naturalWeekField: IField;
+                let naturalWeekFieldId: string
                 try {
-                    naturalWeekField = await table.getFieldByName("自然周");
+                    const naturalWeekField = await table.getFieldByName("自然周");
+                    naturalWeekFieldId=naturalWeekField.id;
                 } catch (e) {
-                    const naturalWeekFieldId = await table.addField({
-                        type: FieldType.Text,
+                    naturalWeekFieldId = await table.addField({
+                        type: FieldType.Formula,
                         name: '自然周',
                     });
-                    naturalWeekField = await table.getFieldById(naturalWeekFieldId)
-                }
-                //获取时间字段列值,并计算自然周
-                const records = await table.getRecords({pageSize: 5000}); // 获取记录列表
-                for (const record of records.records) {
-                    const cellValue = await timeField.getCellString(record.recordId)
-                    // console.log('cellValue',cellValue)
-                    if (cellValue) {
-                        // 假设cellValue是一个日期字符串，你需要将其转换为日期对象，并计算自然周
-                        const date = new Date(cellValue);
-                        const weekOfYear = getISOWeek(date);
-                        // 更新新字段的值
-                        const setValueResult = await table.setCellValue(naturalWeekField.id, record.recordId, `第${weekOfYear.weekNumberFormatStr}周: ${weekOfYear.startDateStr}到${weekOfYear.endDateStr}`)
-                        // console.log('setValueResult', setValueResult)
-                    } else {
-                        const setValueResult = await table.setCellValue(naturalWeekField.id, record.recordId, `0无分组`)
-                    }
-
+                }finally{
+                    // @ts-ignore
+                    table.setField(naturalWeekFieldId,{
+                        type: FieldType.Formula,
+                        name: '自然周',
+                        property:{
+                            formula: 'FORMAT(\n' +
+                                '  "【第{1}周】{2}~{3}",\n' +
+                                '  TEXT(WEEKNUM([日期],2),"00"),\n' +
+                                '  TEXT([日期]-WEEKDAY([日期],2)+1,"MM.DD"),\n' +
+                                '  TEXT([日期]+7-WEEKDAY([日期],2),"MM.DD")\n' +
+                                ')'
+                        }
+                    })
                 }
                 //新增一个视图用于展示分组
                 let natualGridView
@@ -73,12 +70,12 @@ export function Index() {
                 //按照新的一列进行分组
                 const groupInfoResult = await natualGridView.getGroupInfo()
                 if (!groupInfoResult.find(((sortInfo) => {
-                    return sortInfo.fieldId === naturalWeekField.id
+                    return sortInfo.fieldId === naturalWeekFieldId
                 }))) {
-                    const addGroupResult = await natualGridView.addGroup({fieldId: naturalWeekField.id, desc: true})
+                    const addGroupResult = await natualGridView.addGroup({fieldId: naturalWeekFieldId, desc: true})
                     // console.log('addGroupResult:', addGroupResult)
                 }
-                const hideFieldResult = await natualGridView.hideField(naturalWeekField.id)
+                const hideFieldResult = await natualGridView.hideField(naturalWeekFieldId)
                 // console.log('hideFieldResult:', hideFieldResult)
                 //切换视图
                 const switchViewResult = await bitable.ui.switchToView(table.id, natualGridView.id);

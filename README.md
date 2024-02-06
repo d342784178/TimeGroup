@@ -1,6 +1,6 @@
 # Getting Started
 - Hit run
-- Edit [index.tsx](#pages/App/index.tsx) and watch it live update!
+- Edit [Index.tsx](#pages/App/index.tsx) and watch it live update!
 
 # Learn More
 
