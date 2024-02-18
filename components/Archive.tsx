@@ -11,6 +11,7 @@ import TimeArchive from "@/components/archive/TimeArchive";
 export default function Archive() {
     const [fieldMetaList, setFieldMetaList] = useState<IFieldMeta[]>();
     const [table, setTable] = useState<ITable>();
+    const [tableName, setTableName] = useState<string>();
     const [fieldMeta, setFieldMeta] = useState<IFieldMeta>();
     const formApi = useRef<BaseFormApi>();
 
@@ -29,6 +30,7 @@ export default function Archive() {
         console.log("tableChanged", value)
         const table = await bitable.base.getTable(value as string)
         setTable(table)
+        setTableName(await table.getName())
         const fieldMetaList = await table.getFieldMetaList();
         console.log(fieldMetaList)
         let timeFieldMetaList = fieldMetaList.filter((fieldMeta) => {
@@ -71,6 +73,9 @@ export default function Archive() {
         <main className={styles.main}>
             <h1>归档助手</h1>
             <p>按照自然时间对数据进行归档</p>
+            <div>
+                <strong style={{fontSize: '15px'}}>当前表:</strong> {tableName}
+            </div>
             <Form getFormApi={(baseFormApi: BaseFormApi) => formApi.current = baseFormApi}>
                 <Form.Select field='field' label='归档字段' placeholder="Please select a Field" loading={fieldLoading}
                              style={{width: '100%'}} rules={[{required: true, message: 'required error'}]}

@@ -13,7 +13,7 @@ const columns = [
             return (
                 <div>{
                     record[0] === '未知分组' ? (
-                        <Tooltip content={'"归档字段"值为空,无法确定分组,请修正后重新触发预览'}
+                        <Tooltip content={'存在"归档字段"值为空的记录,请修正后重新触发归档预览'}
                                  position={'right'} visible={record[0] === '未知分组'}>
                             <span style={{backgroundColor: 'yellow'}}>{record[0]}</span>
                         </Tooltip>
@@ -44,29 +44,49 @@ export default function TimeArchive({table, fieldMeta}: { table: ITable, fieldMe
     const [loading, setLoading] = useState(false);
     const [groupType, setGroupType] = useState<string>();
     const [previewLoading, setPreviewLoading] = useState(false);
-    const [archivePreview, setArchivePreview] = useState<{ [key: string]: IRecord[] }>();
+    const [archivePreview, setArchivePreview] = useState<Map<string, IRecord[]>>();
 
     const onSubmit = useCallback(async () => {
         setLoading(true)
-        console.log('onSubmit',groupType)
+        console.log('onSubmit', groupType)
+        //生成分组信息
         let previewAcrhive = await preview(groupType as string);
         setArchivePreview(previewAcrhive)
 
-        // 获取原始表格的所有字段信息
+
+        //清理归档表
+        const originTableName = await table.getName()
+        const tableList = await base.getTableList();
+        for (const tableItem of tableList) {
+            const tableName = await tableItem.getName();
+            console.log(tableName, tableName.indexOf(originTableName + " (归档 "))
+            if (tableName.indexOf(originTableName + " (归档 ") > -1) {
+                await base.deleteTable(tableItem.id)
+            }
+        }
+
+        //获取原始表格的所有字段信息
         const view = await table.getActiveView();
         const originFieldMetas = await view.getFieldMetaList();
         console.log('originFieldMetas', originFieldMetas)
 
-        Promise.all(Object.entries(previewAcrhive).map(async ([weekStr, records]: [string, IRecord[]], index) => {
-            await createNewTableFromExisting(weekStr, records, originFieldMetas)
+        Promise.all([...previewAcrhive].map(async ([groupBy, records]: [string, IRecord[]], index) => {
+            await createArchiveTable(originTableName + " (归档 " + groupBy + ")", records, originFieldMetas)
         })).then(() => {
             setLoading(false)
             bitable.ui.showToast({
                 toastType: ToastType.info,
                 message: '归档完成'
             })
+        }).catch((e) => {
+            console.error(e)
+            setLoading(false)
+            bitable.ui.showToast({
+                toastType: ToastType.error,
+                message: '归档异常:' + e
+            })
         })
-    }, [table, fieldMeta,groupType]);
+    }, [table, fieldMeta, groupType]);
 
     const onChange = useCallback(async (value: string | number | any[] | Record<string, any> | undefined) => {
         setPreviewLoading(true)
@@ -75,10 +95,10 @@ export default function TimeArchive({table, fieldMeta}: { table: ITable, fieldMe
         setPreviewLoading(false)
     }, [table, fieldMeta]);
 
-    async function preview(groupBy:string) {
+    async function preview(groupBy: string) {
         const records = await table.getRecords({pageSize: 5000});
         const field = await table.getFieldById(fieldMeta.id);
-        const recordsGroupedByTime: { [key: string]: any[] } = {};
+        const groupMap: Map<string, IRecord[]> = new Map<string, IRecord[]>();
 
         for (const record of records.records) {
             const cellValue = await field.getCellString(record.recordId);
@@ -105,50 +125,55 @@ export default function TimeArchive({table, fieldMeta}: { table: ITable, fieldMe
                 timeGroupString = `未知分组`;
             }
 
-            if (!recordsGroupedByTime[timeGroupString]) {
-                recordsGroupedByTime[timeGroupString] = [];
+            if (!groupMap.has(timeGroupString)) {
+                groupMap.set(timeGroupString, [])
             }
-            recordsGroupedByTime[timeGroupString].push(record);
+            // @ts-ignore
+            groupMap.get(timeGroupString).push(record);
         }
 
-        console.log('preview', recordsGroupedByTime)
-        return recordsGroupedByTime;
+        console.log('preview', groupMap)
+        return groupMap;
     }
 
 
-    async function createNewTableFromExisting(name: string, records: IRecord[], originFieldMetas: IFieldMeta[]) {
-        console.log('createNewTableFromExisting', name, records)
+    async function createArchiveTable(tableName: string, records: IRecord[], originFieldMetas: IFieldMeta[]) {
+        async function addFields() {
+            const fieldIdMap = new Map<string, string>();
+            for (let i = 0; i < originFieldMetas.length; i++) {
+                const originFieldMeta = originFieldMetas[i];
+                let newFieldConfig = {
+                    type: originFieldMeta.type,
+                    description: originFieldMeta.description,
+                    property: originFieldMeta.property,
+                    name: originFieldMeta.name,
+                } as IAddFieldConfig;
+                let newFieldId
+                if (i == 0) {
+                    const firstField = await newTable.getFieldByName('文本')
+                    await newTable.setField(firstField.id, newFieldConfig)
+                    newFieldId = firstField.id
+                } else {
+                    newFieldId = await newTable.addField(newFieldConfig);
+                }
+                if (originFieldMeta.type !== FieldType.Formula) {//公式类型不进行映射
+                    fieldIdMap.set(originFieldMeta.id, newFieldId);
+                } else {
+                    // console.log('formulaField', await table.getFieldById(originFieldMeta.id))
+                    console.log('formulaField', originFieldMeta)
+                }
+            }
+            return fieldIdMap;
+        }
+
+        console.log('createArchiveTable', name, records)
         // 创建一个新的数据表
         const addTableResult = await base.addTable({
-            name: await table.getName() + " 归档 " + name, // 给新表格一个名称
+            name: tableName, // 给新表格一个名称
             fields: []
         });
         const newTable = await base.getTableById(addTableResult.tableId);
-        const fieldIdMap = new Map<string, string>();
-        for (let i = 0; i < originFieldMetas.length; i++) {
-            const originFieldMeta = originFieldMetas[i];
-            let newFieldConfig = {
-                type: originFieldMeta.type,
-                description: originFieldMeta.description,
-                property: originFieldMeta.property,
-                name: originFieldMeta.name,
-            } as IAddFieldConfig;
-            let newFieldId
-            if (i == 0) {
-                const firstField = await newTable.getFieldByName('文本')
-                await newTable.setField(firstField.id, newFieldConfig)
-                newFieldId = firstField.id
-            } else {
-                newFieldId = await newTable.addField(newFieldConfig);
-            }
-            if (originFieldMeta.type !== FieldType.Formula) {//公式类型不进行映射
-                fieldIdMap.set(originFieldMeta.id, newFieldId);
-            } else {
-                // console.log('formulaField', await table.getFieldById(originFieldMeta.id))
-                console.log('formulaField', originFieldMeta)
-            }
-        }
-
+        const fieldIdMap = await addFields();
         await newTable.addRecords(records.map(originRecord => {
             const newRecordData = {};
             for (const [originFieldId, originFieldValue] of Object.entries(originRecord.fields)) {
@@ -177,16 +202,18 @@ export default function TimeArchive({table, fieldMeta}: { table: ITable, fieldMe
                 </Form.Select>
                 <div>
                     <h3>归档预览</h3>
-                    <Table columns={columns} dataSource={archivePreview && Object.entries(archivePreview)}
+                    <p style={{fontSize: '13px'}}>{'将按照以下预览展示将数据进行分组归档'}</p>
+                    <ul>
+                        <li style={{fontSize: '12px'}}>不删除当前表数据,只会新创建归档数据表</li>
+                        <li style={{fontSize: '12px'}}>如果归档数据表已存在则会覆盖</li>
+                    </ul>
+                    <Table columns={columns} dataSource={archivePreview && [...archivePreview]}
                            loading={previewLoading} pagination={false}/>
                 </div>
-                <Tooltip content={'按照"预览"中展示将数据进行分组归档(不影响现有数据表数据,只会新创建数据表)'}
-                         position={'right'}>
-                    <Button theme='solid' htmlType='submit' loading={loading}>进行归档</Button>
-                </Tooltip>
-
+                <br/>
+                <Button theme='solid' htmlType='submit' loading={loading}
+                        disabled={archivePreview && archivePreview.has('未知分组')}>进行归档</Button>
             </Form>
-
         </div>
     )
 }
