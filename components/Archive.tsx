@@ -70,7 +70,7 @@ export default function Archive() {
     return (
         <main className={styles.main}>
             <h1>归档助手</h1>
-            <p>对字段进行条件归档</p>
+            <p>按照自然时间对数据进行归档</p>
 
             <Form getFormApi={(baseFormApi: BaseFormApi) => formApi.current = baseFormApi}>
                 <Form.Select field='field' label='归档字段' placeholder="Please select a Field" loading={fieldLoading}
