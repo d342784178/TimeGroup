@@ -1,6 +1,6 @@
 'use client'
 import {bitable, FieldType, IFieldMeta, ITable} from "@lark-base-open/js-sdk";
-import {Form} from '@douyinfe/semi-ui';
+import {Button, Form, Table, Tooltip} from '@douyinfe/semi-ui';
 import {ReactNode, useCallback, useRef, useState} from 'react';
 import {BaseFormApi} from '@douyinfe/semi-foundation/lib/es/form/interface';
 import styles from './index.module.css';
@@ -16,12 +16,12 @@ export default function Archive() {
 
     const [fieldLoading, setFieldLoading] = useState(false);
 
-
     usePageFocus(async () => {//页面焦点变更 重新获取字段列
         const activeTable = await bitable.base.getActiveTable()
         if (activeTable && table?.id !== activeTable.id) {
             await tableChanged(activeTable.id)
             formApi.current?.setValues({field: null});
+            setFieldMeta(undefined)
             console.log('重新获取到页面焦点, 刷新字段列')
         }
     })
@@ -71,7 +71,6 @@ export default function Archive() {
         <main className={styles.main}>
             <h1>归档助手</h1>
             <p>按照自然时间对数据进行归档</p>
-
             <Form getFormApi={(baseFormApi: BaseFormApi) => formApi.current = baseFormApi}>
                 <Form.Select field='field' label='归档字段' placeholder="Please select a Field" loading={fieldLoading}
                              style={{width: '100%'}} rules={[{required: true, message: 'required error'}]}

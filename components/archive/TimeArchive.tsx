@@ -42,12 +42,14 @@ const columns = [
 export default function TimeArchive({table, fieldMeta}: { table: ITable, fieldMeta: IFieldMeta }) {
 
     const [loading, setLoading] = useState(false);
+    const [groupType, setGroupType] = useState<string>();
     const [previewLoading, setPreviewLoading] = useState(false);
     const [archivePreview, setArchivePreview] = useState<{ [key: string]: IRecord[] }>();
 
     const onSubmit = useCallback(async () => {
         setLoading(true)
-        let previewAcrhive = await preview();
+        console.log('onSubmit',groupType)
+        let previewAcrhive = await preview(groupType as string);
         setArchivePreview(previewAcrhive)
 
         // 获取原始表格的所有字段信息
@@ -64,41 +66,53 @@ export default function TimeArchive({table, fieldMeta}: { table: ITable, fieldMe
                 message: '归档完成'
             })
         })
-    }, [table, fieldMeta]);
+    }, [table, fieldMeta,groupType]);
 
     const onChange = useCallback(async (value: string | number | any[] | Record<string, any> | undefined) => {
         setPreviewLoading(true)
-        setArchivePreview(await preview())
+        setGroupType(value as string)
+        setArchivePreview(await preview(value as string))
         setPreviewLoading(false)
     }, [table, fieldMeta]);
 
-    async function preview() {
-        //获取时间字段列值,并计算自然周
-        const records = await table.getRecords({pageSize: 5000}); // 获取记录列表
-        const field = await table.getFieldById(fieldMeta.id); // 获取记录列表
-        const recordsGroupedByWeek: { [key: string]: any[] } = {};
-        //遍历一边计算出文档总数
+    async function preview(groupBy:string) {
+        const records = await table.getRecords({pageSize: 5000});
+        const field = await table.getFieldById(fieldMeta.id);
+        const recordsGroupedByTime: { [key: string]: any[] } = {};
+
         for (const record of records.records) {
             const cellValue = await field.getCellString(record.recordId);
+            let timeGroupString;
+
             if (cellValue) {
                 const date = new Date(cellValue);
-                const isoWeek = getISOWeek(date);
-                const yearWeekString = `${isoWeek.startDateStr}至${isoWeek.endDateStr}`;
-
-                if (!recordsGroupedByWeek[yearWeekString]) {
-                    recordsGroupedByWeek[yearWeekString] = [];
+                // 根据groupBy的值来决定如何分组
+                switch (groupBy) {
+                    case 'week':
+                        const isoWeek = getISOWeek(date);
+                        timeGroupString = `${isoWeek.startDateStr}至${isoWeek.endDateStr}`;
+                        break;
+                    case 'month':
+                        timeGroupString = `${date.getFullYear()}年${date.getMonth() + 1}月`;
+                        break;
+                    case 'year':
+                        timeGroupString = `${date.getFullYear()}年`;
+                        break;
+                    default:
+                        throw new Error(`Unsupported groupBy value: ${groupBy}`);
                 }
-                recordsGroupedByWeek[yearWeekString].push(record);
             } else {
-                const yearWeekString = `未知分组`;
-                if (!recordsGroupedByWeek[yearWeekString]) {
-                    recordsGroupedByWeek[yearWeekString] = [];
-                }
-                recordsGroupedByWeek[yearWeekString].push(record);
+                timeGroupString = `未知分组`;
             }
+
+            if (!recordsGroupedByTime[timeGroupString]) {
+                recordsGroupedByTime[timeGroupString] = [];
+            }
+            recordsGroupedByTime[timeGroupString].push(record);
         }
-        console.log('preview', recordsGroupedByWeek)
-        return recordsGroupedByWeek
+
+        console.log('preview', recordsGroupedByTime)
+        return recordsGroupedByTime;
     }
 
 
@@ -157,8 +171,8 @@ export default function TimeArchive({table, fieldMeta}: { table: ITable, fieldMe
             <Form onSubmit={onSubmit}>
                 <Form.Select field={'type'} label={'归档参数'} placeholder={`请选择`} onChange={onChange}
                              style={{width: '100%'}} rules={[{required: true, message: 'required error'}]}>
-                    {/*<Form.Select.Option key={'year'} value={'year'} label={'自然年'}/>*/}
-                    {/*<Form.Select.Option key={'month'} value={'month'} label={'自然月'}/>*/}
+                    <Form.Select.Option key={'year'} value={'year'} label={'自然年'}/>
+                    <Form.Select.Option key={'month'} value={'month'} label={'自然月'}/>
                     <Form.Select.Option key={'week'} value={'week'} label={'自然周'}/>
                 </Form.Select>
                 <div>

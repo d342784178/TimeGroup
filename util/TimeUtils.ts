@@ -1,13 +1,4 @@
 export function getISOWeek(date: Date) {
-    // // 根据日期对象创建一个新的Date实例
-    // var currentThursday = new Date(date.getTime() + 3 * 86400000 - (date.getDay() + 6) % 7 * 86400000);
-    //
-    // var yearOfThursday = currentThursday.getFullYear();
-    // var firstThursday = new Date(new Date(yearOfThursday, 0, 4).getTime() + 86400000 - (new Date(yearOfThursday, 0, 4).getDay() + 6) % 7 * 86400000);
-    //
-    // // 计算两个周四之间的周数
-    // var weekNumber = Math.floor(1 + 0.5 + (currentThursday.getTime() - firstThursday.getTime()) / 86400000 / 7);
-
     const dateOfISOWeek = new Date(date.valueOf());
     dateOfISOWeek.setHours(0, 0, 0, 0);
     // Thursday in current week decides the year.
