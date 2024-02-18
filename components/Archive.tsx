@@ -1,5 +1,5 @@
 'use client'
-import {bitable, FieldType, IField, IFieldMeta, ITable} from "@lark-base-open/js-sdk";
+import {bitable, FieldType, IFieldMeta, ITable} from "@lark-base-open/js-sdk";
 import {Form} from '@douyinfe/semi-ui';
 import {ReactNode, useCallback, useRef, useState} from 'react';
 import {BaseFormApi} from '@douyinfe/semi-foundation/lib/es/form/interface';
@@ -12,14 +12,16 @@ export default function Archive() {
     const [fieldMetaList, setFieldMetaList] = useState<IFieldMeta[]>();
     const [table, setTable] = useState<ITable>();
     const [fieldMeta, setFieldMeta] = useState<IFieldMeta>();
+    const formApi = useRef<BaseFormApi>();
 
-    const [loading, setLoading] = useState(false);
+    const [fieldLoading, setFieldLoading] = useState(false);
 
 
     usePageFocus(async () => {//页面焦点变更 重新获取字段列
         const activeTable = await bitable.base.getActiveTable()
-        if (activeTable) {
-            tableChanged(activeTable.id)
+        if (activeTable && table?.id !== activeTable.id) {
+            await tableChanged(activeTable.id)
+            formApi.current?.setValues({field: null});
             console.log('重新获取到页面焦点, 刷新字段列')
         }
     })
@@ -28,7 +30,11 @@ export default function Archive() {
         const table = await bitable.base.getTable(value as string)
         setTable(table)
         const fieldMetaList = await table.getFieldMetaList();
-        setFieldMetaList(fieldMetaList)
+        console.log(fieldMetaList)
+        let timeFieldMetaList = fieldMetaList.filter((fieldMeta) => {
+            return fieldMeta.type === FieldType.DateTime || fieldMeta.type === FieldType.CreatedTime || fieldMeta.type === FieldType.ModifiedTime;
+        });
+        setFieldMetaList(timeFieldMetaList)
     }
     const fieldChanged = async (value: string | number | any[] | Record<string, any>) => {
         console.log("fieldChanged", value)
@@ -66,8 +72,8 @@ export default function Archive() {
             <h1>归档助手</h1>
             <p>对字段进行条件归档</p>
 
-            <Form>
-                <Form.Select field='field' label='字段选择' placeholder="Please select a Field"
+            <Form getFormApi={(baseFormApi: BaseFormApi) => formApi.current = baseFormApi}>
+                <Form.Select field='field' label='归档字段' placeholder="Please select a Field" loading={fieldLoading}
                              style={{width: '100%'}} rules={[{required: true, message: 'required error'}]}
                              onChange={fieldChanged}>
                     {
@@ -82,7 +88,7 @@ export default function Archive() {
                 </Form.Select>
             </Form>
 
-            <h3>归档条件</h3>
+            {/*<h3>归档条件</h3>*/}
             {generateUIComponents()}
 
         </main>
